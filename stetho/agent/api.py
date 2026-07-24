@@ -24,14 +24,9 @@ LOG = log.get_logger()
 
 class AgentApi(object):
 
-    def check_ports_on_br(self, bridge='br-ex', ports=['eth3']):
-        """Check ports exist on bridge.
-
-        ovs-vsctl list-ports bridge
-        """
-        LOG.info("RPC: check_ports_on_br bridge: %s, ports: %s" %
-                 (bridge, ports))
-        cmd = ['ovs-vsctl', 'list-ports', bridge]
+    def check_ports_on_br(self, bridge="br-ex", ports=["eth3"]):
+        LOG.info("RPC: check_ports_on_br bridge: %s, ports: %s" % (bridge, ports))
+        cmd = ["ovs-vsctl", "list-ports", bridge]
         stdcode, stdout = agent_utils.execute(cmd, root=True)
         data = dict()
         if stdcode == 0:
@@ -42,21 +37,15 @@ class AgentApi(object):
                 else:
                     data[port] = False
             return agent_utils.make_response(code=stdcode, data=data)
-        # execute failed.
-        message = stdout.pop(0)
-        return agent_utils.make_response(code=stdcode,
-                                         message=message)
+        message = stdout[0] if stdout else ""
+        return agent_utils.make_response(code=stdcode, message=message)
 
-    def ping(self, ips, boardcast=False,
-             count=2, timeout=2, interface=None):
-        """Ping host or broadcast.
-
-        ping host -c 2 -W 2
-        """
-        cmd = ['ping', '-c', str(count), '-W', str(timeout)]
-        True if not interface else cmd.extend(['-I', interface])
-        True if not boardcast else cmd.append('-b')
-        # Batch create subprocess
+    def ping(self, ips, boardcast=False, count=2, timeout=2, interface=None):
+        cmd = ["ping", "-c", str(count), "-W", str(timeout)]
+        if interface:
+            cmd.extend(["-I", interface])
+        if boardcast:
+            cmd.append("-b")
         data = dict()
         try:
             for ip in ips:
@@ -64,80 +53,78 @@ class AgentApi(object):
                 if stdcode:
                     data[ip] = 100
                 else:
-                    pattern = r',\s([0-9]+)%\spacket\sloss'
+                    pattern = r",\s([0-9]+)%\spacket\sloss"
                     data[ip] = re.search(pattern, stdout[-2]).groups()[0]
             return agent_utils.make_response(code=0, data=data)
         except Exception as e:
-            message = e.message
+            message = str(e)
             return agent_utils.make_response(code=1, message=message)
 
     def add_vlan_to_interface(self, interface, vlan_id):
-        """Add vlan interface.
-
-        ip link add link eth0 name eth0.10 type vlan id 10
-        """
-        subif = '%s.%s' % (interface, vlan_id)
-        vlan_id = '%s' % vlan_id
-        cmd = ['ip', 'link', 'add', 'link', interface, 'name',
-               subif, 'type', 'vlan', 'id', vlan_id]
+        subif = "%s.%s" % (interface, vlan_id)
+        vlan_id = "%s" % vlan_id
+        cmd = [
+            "ip",
+            "link",
+            "add",
+            "link",
+            interface,
+            "name",
+            subif,
+            "type",
+            "vlan",
+            "id",
+            vlan_id,
+        ]
         stdcode, stdout = agent_utils.execute(cmd, root=True)
         if stdcode == 0:
             return agent_utils.make_response(code=stdcode)
-        # execute failed.
-        message = stdout.pop(0)
+        message = stdout[0] if stdout else ""
         return agent_utils.make_response(code=stdcode, message=message)
 
-    def get_interface(self, interface='eth0'):
-        """Interface info.
-
-        ifconfig interface
-        """
-        LOG.info("RPC: get_interface interfae: %s" % interface)
+    def get_interface(self, interface="eth0"):
+        LOG.info("RPC: get_interface interface: %s" % interface)
         code, message, data = agent_utils.get_interface(interface)
         return agent_utils.make_response(code, message, data)
 
     def setup_link(self, interface, cidr):
-        """Setup a link.
-
-        ip addr add dev interface
-        ip link  set dev interface up
-        """
-        # clear old ipaddr in interface
-        cmd = ['ip', 'addr', 'flush', 'dev', interface]
+        cmd = ["ip", "addr", "flush", "dev", interface]
         agent_utils.execute(cmd, root=True)
         ip = IPNetwork(cidr)
-        cmd = ['ip', 'addr', 'add', cidr, 'broadcast',
-               str(ip.broadcast), 'dev', interface]
+        cmd = [
+            "ip",
+            "addr",
+            "add",
+            cidr,
+            "broadcast",
+            str(ip.broadcast),
+            "dev",
+            interface,
+        ]
         stdcode, stdout = agent_utils.execute(cmd, root=True)
         if stdcode == 0:
-            cmd = ['ip', 'link', 'set', 'dev', interface, 'up']
+            cmd = ["ip", "link", "set", "dev", interface, "up"]
             stdcode, stdout = agent_utils.execute(cmd, root=True)
             if stdcode == 0:
                 return agent_utils.make_response(code=stdcode)
-        # execute failed.
-        message = stdout.pop(0)
+        message = stdout[0] if stdout else ""
         return agent_utils.make_response(code=stdcode, message=message)
 
     def teardown_link(self, interface):
-        """ip link
-        """
-        cmd = ['ip', 'link', 'delete', interface]
+        cmd = ["ip", "link", "delete", interface]
         stdcode, stdout = agent_utils.execute(cmd, root=True)
         if stdcode == 0:
             return agent_utils.make_response(code=stdcode)
-        # execute failed.
-        message = stdout.pop(0)
+        message = stdout[0] if stdout else ""
         return agent_utils.make_response(code=stdcode, message=message)
 
-    def setup_iperf_server(self, protocol='TCP', port=5001, window=None):
-        """iperf -s
-        """
+    def setup_iperf_server(self, protocol="TCP", port=5001, window=None):
         iperf = iperf_driver.IPerfDriver()
         try:
-            data = iperf.start_server(protocol='TCP', port=5001, window=None)
+            data = iperf.start_server(protocol="TCP", port=5001, window=None)
             return agent_utils.make_response(code=0, data=data)
         except:
-            message = 'Start iperf server failed!'
+            message = "Start iperf server failed!"
             return agent_utils.make_response(code=1, message=message)
 
     def teardown_iperf_server(self, pid):
@@ -146,17 +133,19 @@ class AgentApi(object):
             iperf.stop_server(pid)
             return agent_utils.make_response(code=0)
         except Exception as e:
-            message = e.message
+            message = str(e)
             return agent_utils.make_response(code=1, message=message)
 
-    def start_iperf_client(self, host, protocol='TCP', timeout=5,
-                           parallel=None, bandwidth=None, port=5001):
+    def start_iperf_client(
+        self, host, protocol="TCP", timeout=5, parallel=None, bandwidth=None, port=5001
+    ):
         iperf = iperf_driver.IPerfDriver()
         try:
-            data = iperf.start_client(host, protocol='TCP', timeout=5,
-                                      parallel=None, bandwidth=None)
-            data['server_ip'] = host
+            data = iperf.start_client(
+                host, protocol="TCP", timeout=5, parallel=None, bandwidth=None
+            )
+            data["server_ip"] = host
             return agent_utils.make_response(code=0, data=data)
         except Exception as e:
-            message = e.message
+            message = str(e)
             return agent_utils.make_response(code=1, message=message)

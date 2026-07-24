@@ -23,24 +23,22 @@ from cliff import app
 from cliff import commandmanager
 from stetho.stethoclient import agent_api
 from stetho.stethoclient.drivers import iperf_api
-from stetho.stethoclient import strutils
 
-
-VERSION = '0.1'
-STETHO_API_VERSION = '0.1'
+VERSION = "0.1"
+STETHO_API_VERSION = "0.1"
 
 COMMAND_V1 = {
-    'setup-link': agent_api.SetUpLink,
-    'teardown-link': agent_api.TearDownLink,
-    'add-vlan-to-interface': agent_api.AddVlanToInterface,
-    'ping': agent_api.AgentPing,
-    'check-ports-on-br': agent_api.CheckPortsOnBr,
-    'get-interface': agent_api.GetInterface,
-    'check-vlan-interface': agent_api.CheckVlanInterface,
-    'check-iperf': iperf_api.CheckIperf,
+    "setup-link": agent_api.SetUpLink,
+    "teardown-link": agent_api.TearDownLink,
+    "add-vlan-to-interface": agent_api.AddVlanToInterface,
+    "ping": agent_api.AgentPing,
+    "check-ports-on-br": agent_api.CheckPortsOnBr,
+    "get-interface": agent_api.GetInterface,
+    "check-vlan-interface": agent_api.CheckVlanInterface,
+    "check-iperf": iperf_api.CheckIperf,
 }
 
-COMMANDS = {'0.1': COMMAND_V1}
+COMMANDS = {"0.1": COMMAND_V1}
 
 
 class StethoShell(app.App):
@@ -49,34 +47,34 @@ class StethoShell(app.App):
         super(StethoShell, self).__init__(
             description=__doc__.strip(),
             version=VERSION,
-            command_manager=commandmanager.CommandManager('stetho.cli'),
+            command_manager=commandmanager.CommandManager("stetho.cli"),
         )
         self.commands = COMMANDS
         for k, v in self.commands[apiversion].items():
             self.command_manager.add_command(k, v)
 
     def initialize_app(self, argv):
-        self.LOG.debug('initialize_app')
+        self.LOG.debug("initialize_app")
 
     def prepare_to_run_command(self, cmd):
-        self.LOG.debug('prepare_to_run_command %s', cmd.__class__.__name__)
+        self.LOG.debug("prepare_to_run_command %s", cmd.__class__.__name__)
 
     def clean_up(self, cmd, result, err):
-        self.LOG.debug('clean_up %s', cmd.__class__.__name__)
+        self.LOG.debug("clean_up %s", cmd.__class__.__name__)
         if err:
-            self.LOG.debug('got an error: %s', err)
+            self.LOG.debug("got an error: %s", err)
 
 
 def main(argv=sys.argv[1:]):
     try:
-        return StethoShell(STETHO_API_VERSION).run(
-            list(map(strutils.safe_decode, argv)))
+        return StethoShell(STETHO_API_VERSION).run(argv)
     except KeyboardInterrupt:
-        print "... terminating neutron client"
+        print("... terminating neutron client")
         return 1
     except Exception as e:
         print(e)
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv[1:]))

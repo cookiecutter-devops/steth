@@ -19,49 +19,46 @@ from stetho.agent.common import utils
 
 LOG = log.get_logger()
 
-OUT_DIR = '/tmp/'
+OUT_DIR = "/tmp/"
 
 
 class IPerfDriver(object):
 
-    def start_server(self, protocol='TCP', port=5001, mss=None, window=None):
-        """iperf -s -D --mss mss
-        """
-        cmd = ['iperf', '-s', '-p', str(port)]
-        if not cmp(protocol, 'UDP'):
-            cmd.append('-u')
+    def start_server(self, protocol="TCP", port=5001, mss=None, window=None):
+        cmd = ["iperf", "-s", "-p", str(port)]
+        if protocol == "UDP":
+            cmd.append("-u")
         if mss:
-            cmd.extend(['-M', str(mss)])
+            cmd.extend(["-M", str(mss)])
         if window:
-            cmd.extend(['-w', str(window)])
+            cmd.extend(["-w", str(window)])
         pid = utils.create_deamon(cmd)
         data = dict()
-        data['pid'] = pid
+        data["pid"] = pid
         return data
 
     def stop_server(self, pid):
         utils.kill_process_by_id(pid)
 
-    def start_client(self, host, port=5001, protocol='TCP', timeout=5,
-                     parallel=None, bandwidth=None):
-        """iperf -D -c host -t 60
-        """
-        cmd = ['iperf',  '-c', host, '-p', str(port), '-t', str(timeout)]
-        if not (protocol, 'UDP'):
-            cmd.append('-u')
+    def start_client(
+        self, host, port=5001, protocol="TCP", timeout=5, parallel=None, bandwidth=None
+    ):
+        cmd = ["iperf", "-c", host, "-p", str(port), "-t", str(timeout)]
+        if protocol == "UDP":
+            cmd.append("-u")
         if parallel:
-            cmd.extend(['-P', str(parallel)])
+            cmd.extend(["-P", str(parallel)])
         if bandwidth:
-            cmd.extend(['-b', '%sM' % bandwidth])
+            cmd.extend(["-b", "%sM" % bandwidth])
         stdcode, stdout, stderr = utils.execute_wait(cmd)
-        if (not stdcode) or (not stderr):
-            out_dict = stdout.split('\n')
+        if not stdcode or not stderr:
+            out_dict = stdout.split("\n")
             if not out_dict[-1]:
                 out_dict.pop()
             out_data = out_dict[-1].split()
             data = dict()
-            data['Bandwidth'] = out_data[-2] + ' ' + out_data[-1]
-            data['Transfer'] = out_data[-4] + ' ' + out_data[-3]
-            data['Interval'] = out_data[-6]
+            data["Bandwidth"] = out_data[-2] + " " + out_data[-1]
+            data["Transfer"] = out_data[-4] + " " + out_data[-3]
+            data["Interval"] = out_data[-6]
             return data
-        raise Exception('Start iperf failed, please check on the node.')
+        raise Exception("Start iperf failed, please check on the node.")

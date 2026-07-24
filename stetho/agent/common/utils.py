@@ -31,10 +31,11 @@ LOG = log.get_logger()
 def execute(cmd, shell=False, root=False, timeout=10):
     try:
         if root:
-            cmd.insert(0, 'sudo')
+            cmd.insert(0, "sudo")
         LOG.info(cmd)
-        subproc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE, shell=shell)
+        subproc = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=shell
+        )
         timer = Timer(timeout, lambda proc: proc.kill(), [subproc])
         timer.start()
         subproc.wait()
@@ -44,126 +45,145 @@ def execute(cmd, shell=False, root=False, timeout=10):
         timer.cancel()
 
         def list_strip(lines):
-            return [line.strip() for line in lines]
+            return [line.strip().decode("utf-8", errors="ignore") for line in lines]
+
         return stdcode, list_strip(stderr) if stdcode else list_strip(stdout)
     except Exception as e:
-        LOG.error(e)
+        LOG.error(str(e))
         raise
 
 
 def execute_wait(cmd, shell=False, root=False):
-    subproc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                               stderr=subprocess.PIPE, shell=shell)
+    if root:
+        cmd.insert(0, "sudo")
+    subproc = subprocess.Popen(
+        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=shell
+    )
     stdout, stderr = subproc.communicate()
     stdcode = subproc.returncode
-    return stdcode, stdout, stderr
+    return (
+        stdcode,
+        stdout.decode("utf-8", errors="ignore"),
+        stderr.decode("utf-8", errors="ignore"),
+    )
 
 
 def create_deamon(cmd, shell=False, root=False):
-    """Usage:
-        Create servcice process.
-    """
     try:
         if root:
-            cmd.insert(0, 'sudo')
+            cmd.insert(0, "sudo")
         LOG.info(cmd)
-        subproc = subprocess.Popen(cmd, shell=shell, stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE)
+        subproc = subprocess.Popen(
+            cmd, shell=shell, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
         return subproc.pid
     except Exception as e:
-        LOG.error(e)
+        LOG.error(str(e))
         raise
 
 
 def kill_process_by_id(pid):
     pid = int(pid)
-    os.kill(pid, signal.SIGILL)
-    os.waitpid(pid, 0)
+    os.kill(pid, signal.SIGKILL)
+    try:
+        os.waitpid(pid, 0)
+    except OSError:
+        pass
+
+
+def get_linux_distribution():
+    try:
+        import distro
+
+        return distro.linux_distribution()
+    except ImportError:
+        pass
+    try:
+        release = platform.release()
+        return ("centos", release, "")
+    except:
+        return ("unknown", "0.0", "")
 
 
 def get_interface(interface):
-    """Support Centos standard physical interface,
-       such as eth0.
-    """
-    # Supported CentOS Version
-    supported_dists = ['7.0', '6.5']
+    supported_dists = ["7.0", "6.5"]
 
     def format_centos_7_0(inf):
-        pattern = r'<([A-Z]+)'
+        pattern = r"<([A-Z]+)"
         state = re.search(pattern, stdout[0]).groups()[0]
-        state = 'UP' if not cmp(state, 'UP') else 'DOWN'
+        state = "UP" if state == "UP" else "DOWN"
         inf.state = state
         stdout.pop(0)
-        pattern = r'inet\s(.*)\s\snetmask\s(.*)\s\sbroadcast\s(.*)'
+        pattern = r"inet\s(.*)\s\snetmask\s(.*)\s\sbroadcast\s(.*)"
         for line in stdout:
-            if line.startswith('inet '):
+            if line.startswith("inet "):
                 tmp = re.search(pattern, line).groups()
-                (inf.inet, inf.netmask, inf.broadcast) = tmp
+                inf.inet, inf.netmask, inf.broadcast = tmp
                 stdout.remove(line)
                 break
         for line in stdout:
-            if line.startswith('ether'):
+            if line.startswith("ether"):
                 inf.ether = line[6:23]
                 break
-        return stdcode, '', inf.make_dict()
+        return stdcode, "", inf.make_dict()
 
     def format_centos_6_5(inf):
-        pattern = r'HWaddr\s(.*)'
+        pattern = r"HWaddr\s(.*)"
         inf.ether = re.search(pattern, stdout[0]).groups()[0]
         stdout.pop(0)
-        pattern = r'addr:(.*)\s\sBcast:(.*)\s\sMask:(.*)'
+        pattern = r"addr:(.*)\s\sBcast:(.*)\s\sMask:(.*)"
         for line in stdout:
-            if line.startswith('inet '):
+            if line.startswith("inet "):
                 tmp = re.search(pattern, line).groups()
-                (inf.inet, inf.broadcast, inf.netmask) = tmp
+                inf.inet, inf.broadcast, inf.netmask = tmp
                 stdout.remove(line)
                 break
-        inf.state = 'DOWN'
+        inf.state = "DOWN"
         for line in stdout:
-            if 'RUNNING' in line:
+            if "RUNNING" in line:
                 state = line[:2]
-                state = 'UP' if not cmp(state, 'UP') else 'DOWN'
+                state = "UP" if state == "UP" else "DOWN"
                 inf.state = state
                 break
-        return stdcode, '', inf.make_dict()
+        return stdcode, "", inf.make_dict()
 
-    linux_dist = platform.linux_distribution()[1][:3]
+    linux_dist = get_linux_distribution()[1][:3]
     if linux_dist in supported_dists:
         try:
-            cmd = ['ifconfig', interface]
+            cmd = ["ifconfig", interface]
             stdcode, stdout = execute(cmd)
             inf = resource.Interface(interface)
-            if not cmp(linux_dist, '6.5'):
+            if linux_dist == "6.5":
                 return format_centos_6_5(inf)
-            elif not cmp(linux_dist, '7.0'):
+            elif linux_dist == "7.0":
                 return format_centos_7_0(inf)
         except Exception as e:
-            message = stdout.pop(0)
+            message = stdout[0] if stdout else str(e)
             return stdcode, message, None
 
-    # Unsupported OS distribute
-    message = 'Unsupported OS distribute %s, only support for CentOS %s.'
+    message = "Unsupported OS distribute %s, only support for CentOS %s."
     message = message % (linux_dist, str(supported_dists))
     return 1, message, None
 
 
 def register_api(server, api_obj):
     methods = dir(api_obj)
-    apis = filter(lambda m: not m.startswith('_'), methods)
-    [server.register_function(getattr(api_obj, api)) for api in apis]
+    apis = list(filter(lambda m: not m.startswith("_"), methods))
+    for api in apis:
+        server.register_function(getattr(api_obj, api))
     LOG.info("Registered api %s" % apis)
 
 
-def make_response(code=0, message='', data=dict()):
+def make_response(code=0, message="", data=dict()):
     response = dict()
-    response['code'] = code
-    response['message'] = '' if message is None else message
-    response['data'] = dict() if data is None else data
+    response["code"] = code
+    response["message"] = "" if message is None else message
+    response["data"] = dict() if data is None else data
     return response
 
 
 def replace_file(file_name, mode=0o644):
     base_dir = os.path.dirname(os.path.abspath(file_name))
-    tmp_file = tempfile.NamedTemporaryFile('w+', dir=base_dir, delete=False)
+    tmp_file = tempfile.NamedTemporaryFile("w+", dir=base_dir, delete=False)
     os.chmod(tmp_file.name, mode)
     os.rename(tmp_file.name, file_name)

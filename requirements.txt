@@ -1,5 +1,5 @@
 pbr
-jsonrpclib
+jsonrpclib-pelix
 netaddr
 cliff
-oslo.config>=1.6.0
+oslo.config>=5.0.0
