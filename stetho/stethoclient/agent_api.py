@@ -25,6 +25,20 @@ LISTEN_PORT = 9698
 SETUP_LINK_IP_PRE = "192.168.100."
 
 
+def get_ip_suffix(agent_name):
+    try:
+        return agent_name.split("-")[1]
+    except (IndexError, ValueError):
+        pass
+    try:
+        agent_ip = AGENT_INFOS.get(agent_name)
+        if agent_ip:
+            return agent_ip.rsplit(".", 1)[1]
+    except Exception:
+        pass
+    return "1"
+
+
 class Logger:
     HEADER = "\033[95m"
     OKBLUE = "\033[94m"
@@ -86,9 +100,9 @@ class TearDownLink(Command):
         self.log.debug("Interface is %s" % parsed_args.interface)
         server = setup_server(parsed_args.agent)
         try:
-            res = server.teardown_link(parsed_args.interface)
+            server.teardown_link(parsed_args.interface)
         except Exception as e:
-            self.log.error("Error %s has occured." % res)
+            self.log.error("Error %s has occured." % str(e))
 
 
 class SetUpLink(Lister):
@@ -110,7 +124,11 @@ class SetUpLink(Lister):
         self.log.debug("Cidr is %s" % parsed_args.cidr)
         server = setup_server(parsed_args.agent)
         try:
-            server.setup_link(parsed_args.interface, parsed_args.cidr)
+            res = server.setup_link(parsed_args.interface, parsed_args.cidr)
+            self.log.debug("Response is %s" % res)
+            if res["code"] == 1:
+                Logger.log_fail(res["message"])
+                sys.exit()
             res = server.get_interface(parsed_args.interface)
             self.log.debug("Response is %s" % res)
             if res["code"] == 1:
@@ -291,25 +309,38 @@ class CheckVlanInterface(Lister):
                 parsed_args.interface, parsed_args.vlan_id
             )
             self.log.debug("Response is %s" % resA)
+            if resA["code"] == 1:
+                Logger.log_fail("AgentA add vlan failed: %s" % resA["message"])
+                sys.exit()
             resB = serverB.add_vlan_to_interface(
                 parsed_args.interface, parsed_args.vlan_id
             )
             self.log.debug("Response is %s" % resB)
+            if resB["code"] == 1:
+                Logger.log_fail("AgentB add vlan failed: %s" % resB["message"])
+                sys.exit()
             Logger.log_normal(
                 ("AgentA and agentB has already added the " "interface %s ")
                 % (interface)
             )
-            ipA = SETUP_LINK_IP_PRE + parsed_args.agentA.split("-")[1] + "/24"
+            ipA = SETUP_LINK_IP_PRE + get_ip_suffix(parsed_args.agentA) + "/24"
             resA = serverA.setup_link(interface, ipA)
             self.log.debug("Response is %s" % resA)
-            ipB = SETUP_LINK_IP_PRE + parsed_args.agentB.split("-")[1] + "/24"
+            if resA["code"] == 1:
+                Logger.log_fail("AgentA setup link failed: %s" % resA["message"])
+                sys.exit()
+            ipB = SETUP_LINK_IP_PRE + get_ip_suffix(parsed_args.agentB) + "/24"
             resB = serverB.setup_link(interface, ipB)
             self.log.debug("Response is %s" % resB)
+            if resB["code"] == 1:
+                Logger.log_fail("AgentB setup link failed: %s" % resB["message"])
+                sys.exit()
             Logger.log_normal(
                 ("AgentA and agentB has already setup the " "IP %s and IP %s")
                 % (ipA, ipB)
             )
-            res = serverA.ping(ips=[ipB])
+            ipB_for_ping = ipB.split("/")[0]
+            res = serverA.ping(ips=[ipB_for_ping])
             resA = serverA.teardown_link(interface)
             self.log.debug("Response is %s" % resA)
             resB = serverB.teardown_link(interface)
@@ -324,5 +355,5 @@ class CheckVlanInterface(Lister):
                     ((k, v) for k, v in res["data"].items()),
                 )
         except Exception as e:
-            self.log.error("Agent %s return error: %s!" % (parsed_args.agent, e))
+            self.log.error("Agent error occurred: %s!" % str(e))
             sys.exit()

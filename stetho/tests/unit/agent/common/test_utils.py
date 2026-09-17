@@ -78,9 +78,9 @@ class TestUtils(unittest.TestCase):
         utils.get_linux_distribution = mock.Mock(return_value=["", "6.6", ""])
         self.assertEqual(utils.get_interface("eth0")[0], 1)
 
-    def test_create_deamon(self):
+    def test_create_daemon(self):
         cmd = ["ls", self.test_file]
-        pid = utils.create_deamon(cmd)
+        pid = utils.create_daemon(cmd)
         self.pids.append(pid)
         self.assertEqual(type(pid), int)
 

@@ -24,7 +24,7 @@ class TestIPerfDriver(unittest.TestCase):
         self.iperfd = iperf.IPerfDriver()
 
     def test_start_server(self):
-        utils.create_deamon = mock.Mock(return_value=1000)
+        utils.create_daemon = mock.Mock(return_value=1000)
         data = self.iperfd.start_server(protocol='UDP')
         self.assertEqual(data['pid'], 1000)
 

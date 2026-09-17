@@ -30,11 +30,10 @@ LOG = log.get_logger()
 
 def execute(cmd, shell=False, root=False, timeout=10):
     try:
-        if root:
-            cmd.insert(0, "sudo")
-        LOG.info(cmd)
+        exec_cmd = ["sudo"] + cmd if root else list(cmd)
+        LOG.info(exec_cmd)
         subproc = subprocess.Popen(
-            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=shell
+            exec_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=shell
         )
         timer = Timer(timeout, lambda proc: proc.kill(), [subproc])
         timer.start()
@@ -54,10 +53,9 @@ def execute(cmd, shell=False, root=False, timeout=10):
 
 
 def execute_wait(cmd, shell=False, root=False):
-    if root:
-        cmd.insert(0, "sudo")
+    exec_cmd = ["sudo"] + cmd if root else list(cmd)
     subproc = subprocess.Popen(
-        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=shell
+        exec_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=shell
     )
     stdout, stderr = subproc.communicate()
     stdcode = subproc.returncode
@@ -68,13 +66,12 @@ def execute_wait(cmd, shell=False, root=False):
     )
 
 
-def create_deamon(cmd, shell=False, root=False):
+def create_daemon(cmd, shell=False, root=False):
     try:
-        if root:
-            cmd.insert(0, "sudo")
-        LOG.info(cmd)
+        exec_cmd = ["sudo"] + cmd if root else list(cmd)
+        LOG.info(exec_cmd)
         subproc = subprocess.Popen(
-            cmd, shell=shell, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            exec_cmd, shell=shell, stdout=subprocess.PIPE, stderr=subprocess.PIPE
         )
         return subproc.pid
     except Exception as e:
@@ -84,7 +81,10 @@ def create_deamon(cmd, shell=False, root=False):
 
 def kill_process_by_id(pid):
     pid = int(pid)
-    os.kill(pid, signal.SIGKILL)
+    try:
+        os.kill(pid, signal.SIGKILL)
+    except OSError:
+        pass
     try:
         os.waitpid(pid, 0)
     except OSError:
@@ -101,7 +101,7 @@ def get_linux_distribution():
     try:
         release = platform.release()
         return ("centos", release, "")
-    except:
+    except Exception:
         return ("unknown", "0.0", "")
 
 
@@ -149,9 +149,14 @@ def get_interface(interface):
 
     linux_dist = get_linux_distribution()[1][:3]
     if linux_dist in supported_dists:
+        stdcode = 1
+        stdout = None
         try:
             cmd = ["ifconfig", interface]
             stdcode, stdout = execute(cmd)
+            if stdcode != 0:
+                message = stdout[0] if stdout else "ifconfig command failed"
+                return stdcode, message, None
             inf = resource.Interface(interface)
             if linux_dist == "6.5":
                 return format_centos_6_5(inf)
@@ -174,7 +179,7 @@ def register_api(server, api_obj):
     LOG.info("Registered api %s" % apis)
 
 
-def make_response(code=0, message="", data=dict()):
+def make_response(code=0, message="", data=None):
     response = dict()
     response["code"] = code
     response["message"] = "" if message is None else message

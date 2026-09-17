@@ -70,7 +70,7 @@ class TestApi(unittest.TestCase):
         self.assertEqual(agent_utils.make_response.called, True)
 
     def test_start_iperf_client(self):
-        agent_utils.create_deamon = mock.Mock(return_value=100)
+        agent_utils.create_daemon = mock.Mock(return_value=100)
         self.agent_api.setup_iperf_server('UDP')
         self.assertEqual(agent_utils.make_response.called, True)
 

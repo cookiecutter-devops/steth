@@ -32,7 +32,7 @@ class IPerfDriver(object):
             cmd.extend(["-M", str(mss)])
         if window:
             cmd.extend(["-w", str(window)])
-        pid = utils.create_deamon(cmd)
+        pid = utils.create_daemon(cmd)
         data = dict()
         data["pid"] = pid
         return data
@@ -51,7 +51,7 @@ class IPerfDriver(object):
         if bandwidth:
             cmd.extend(["-b", "%sM" % bandwidth])
         stdcode, stdout, stderr = utils.execute_wait(cmd)
-        if not stdcode or not stderr:
+        if stdcode == 0:
             out_dict = stdout.split("\n")
             if not out_dict[-1]:
                 out_dict.pop()
@@ -61,4 +61,4 @@ class IPerfDriver(object):
             data["Transfer"] = out_data[-4] + " " + out_data[-3]
             data["Interval"] = out_data[-6]
             return data
-        raise Exception("Start iperf failed, please check on the node.")
+        raise Exception("Start iperf failed, please check on the node. stderr: %s" % stderr)

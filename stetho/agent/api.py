@@ -40,11 +40,11 @@ class AgentApi(object):
         message = stdout[0] if stdout else ""
         return agent_utils.make_response(code=stdcode, message=message)
 
-    def ping(self, ips, boardcast=False, count=2, timeout=2, interface=None):
+    def ping(self, ips, broadcast=False, count=2, timeout=2, interface=None):
         cmd = ["ping", "-c", str(count), "-W", str(timeout)]
         if interface:
             cmd.extend(["-I", interface])
-        if boardcast:
+        if broadcast:
             cmd.append("-b")
         data = dict()
         try:
@@ -89,7 +89,10 @@ class AgentApi(object):
 
     def setup_link(self, interface, cidr):
         cmd = ["ip", "addr", "flush", "dev", interface]
-        agent_utils.execute(cmd, root=True)
+        stdcode, stdout = agent_utils.execute(cmd, root=True)
+        if stdcode != 0:
+            message = stdout[0] if stdout else "flush interface failed"
+            return agent_utils.make_response(code=stdcode, message=message)
         ip = IPNetwork(cidr)
         cmd = [
             "ip",
@@ -121,10 +124,10 @@ class AgentApi(object):
     def setup_iperf_server(self, protocol="TCP", port=5001, window=None):
         iperf = iperf_driver.IPerfDriver()
         try:
-            data = iperf.start_server(protocol="TCP", port=5001, window=None)
+            data = iperf.start_server(protocol=protocol, port=port, window=window)
             return agent_utils.make_response(code=0, data=data)
-        except:
-            message = "Start iperf server failed!"
+        except Exception as e:
+            message = "Start iperf server failed: %s" % str(e)
             return agent_utils.make_response(code=1, message=message)
 
     def teardown_iperf_server(self, pid):
@@ -142,7 +145,8 @@ class AgentApi(object):
         iperf = iperf_driver.IPerfDriver()
         try:
             data = iperf.start_client(
-                host, protocol="TCP", timeout=5, parallel=None, bandwidth=None
+                host, port=port, protocol=protocol, timeout=timeout,
+                parallel=parallel, bandwidth=bandwidth
             )
             data["server_ip"] = host
             return agent_utils.make_response(code=0, data=data)

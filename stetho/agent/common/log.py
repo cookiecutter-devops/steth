@@ -21,9 +21,9 @@ FILENAME = '/var/log/stetho/stetho-agent.log'
 
 
 def get_logger(filename=FILENAME, format=FORMAT,
-               datefmt=DATEFMT, filemod='a+',
+               datefmt=DATEFMT, filemode='a+',
                level=logging.DEBUG):
     logging.basicConfig(level=level, format=format, datefmt=datefmt,
-                        filename=filename, filemod=filemod)
+                        filename=filename, filemode=filemode)
     log = logging.getLogger()
     return log

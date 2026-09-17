@@ -69,7 +69,16 @@ def setup_server(agent):
 
 
 def get_ip_by_hostname(hostname):
-    return socket.gethostbyname(hostname)
+    if hostname in AGENT_INFOS:
+        return AGENT_INFOS[hostname]
+    try:
+        return socket.gethostbyname(hostname)
+    except socket.gaierror:
+        Logger.log_fail(
+            "Cannot resolve host %s. Not found in AGENT_INFOS and DNS lookup failed."
+            % hostname
+        )
+        sys.exit()
 
 
 class CheckIperf(Lister):
@@ -109,15 +118,24 @@ class CheckIperf(Lister):
             Logger.log_high(msg)
             iperf_server_pid = res["data"]["pid"]
         host = get_ip_by_hostname(parsed_args.server_agent)
-        res = client.start_iperf_client(
-            protocol=parsed_args.client_protocol,
-            host=host,
-            timeout=parsed_args.client_timeout,
-            parallel=parsed_args.client_parallel,
-            bandwidth=parsed_args.client_bandwidth,
-            port=parsed_args.client_port,
-        )
+        try:
+            res = client.start_iperf_client(
+                protocol=parsed_args.client_protocol,
+                host=host,
+                timeout=parsed_args.client_timeout,
+                parallel=parsed_args.client_parallel,
+                bandwidth=parsed_args.client_bandwidth,
+                port=parsed_args.client_port,
+            )
+        except Exception as e:
+            Logger.log_fail("Start iperf client failed: %s" % str(e))
+            server.teardown_iperf_server(iperf_server_pid)
+            sys.exit()
         self.log.debug("Response is %s" % res)
+        if res["code"] == 1:
+            Logger.log_fail(res["message"])
+            server.teardown_iperf_server(iperf_server_pid)
+            sys.exit()
         r = server.teardown_iperf_server(iperf_server_pid)
         if r["code"] == 1:
             Logger.log_fail(r["message"])
